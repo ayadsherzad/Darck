@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>App List & IPA Upload</title>
+  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+  <style>
+    /* Reset and global styles */
+    * {
+      background: #1e1e1e;
+      color: #fff;
+      font-family: system-ui;
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    .apptitle {
+      margin: 20px 0;
+      font-weight: 900;
+      text-align: center;
+    }
+
+    img {
+      width: 40px;
+      border-radius: 10px;
+      border: 2px solid #ffe400;
+    }
+
+    .app {
+      width: 100%;
+      height: 60px;
+      background: #120120;
+      outline: 1px solid #fff;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      border-radius: 0.5em;
+    }
+
+    .btns {
+      margin-left: auto;
+      display: flex;
+      gap: 10px;
+      margin-right: 10px;
+    }
+
+    .btn {
+      width: 80px;
+      height: 30px;
+      background: none;
+      border-radius: 5px;
+      text-decoration: none;
+      color: #fff;
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .delete {
+      color: red;
+      border: 2px solid red;
+    }
+
+    .download-plist {
+      color: green;
+      border: 2px solid green;
+    }
+
+    .appimg {
+      margin-left: 10px;
+    }
+
+    .appname {
+      margin-left: 15px;
+    }
+
+    #progressContainer {
+      width: 100%;
+      background-color: #f3f3f3;
+      border: 1px solid #ccc;
+      margin-top: 10px;
+      border-radius: 5px;
+    }
+
+    #progressBar {
+      width: 0%;
+      height: 30px;
+      background-color: #4caf50;
+      text-align: center;
+      line-height: 30px;
+      color: white;
+      border-radius: 5px;
+    }
+
+    #speed, #plistLink {
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    #totalApps {
+      font-weight: bold;
+      margin-bottom: 10px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h2 class="apptitle">B52</h2>
+  <form enctype="multipart/form-data">
+    <input id="fileInput" type="file" name="file" accept=".ipa" required>
+    <button class="buttonn" type="button" onclick="uploadFile()">UPLOAD</button>
+  </form>
+
+  <div id="progressContainer">
+    <div id="progressBar">0%</div>
+  </div>
+  <div id="speed">Upload speed: 0 KB/s</div>
+  <div id="message"></div>
+  <div id="plistLink"></div>
+
+  <h2 class="apptitle">App List</h2>
+  <div id="totalApps">Total Apps: 0</div>
+  <hr>
+  <div id="appList"></div>
+
+  <script>
+    let appCount = 0;
+
+    function generateRandomString(length) {
+      const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+      return Array.from({ length }, () => characters.charAt(Math.floor(Math.random() * characters.length))).join('');
+    }
+
+    function updateAppCount() {
+      document.getElementById("totalApps").innerText = "Total Apps: " + appCount;
+    }
+
+    function generatePlist(url, ipaName) {
+      const plistName = generateRandomString(12);
+      const bundleId = generateRandomString(16);
+
+      const plist = `
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+          <key>items</key>
+          <array>
+            <dict>
+              <key>assets</key>
+              <array>
+                <dict>
+                  <key>kind</key>
+                  <string>software-package</string>
+                  <key>url</key>
+                  <string>${url}</string>
+                </dict>
+              </array>
+              <key>metadata</key>
+              <dict>
+                <key>bundle-identifier</key>
+                <string>com.example.${bundleId}</string>
+                <key>bundle-version</key>
+                <string>1.0</string>
+                <key>kind</key>
+                <string>software</string>
+                <key>title</key>
+                <string>${ipaName}</string>
+              </dict>
+            </dict>
+          </array>
+        </dict>
+        </plist>
+      `;
+      return { plist, plistName };
+    }
+
+    function addToAppList(appName, bundleId, iconUrl, plistUrl) {
+      const appList = document.getElementById("appList");
+      const appHTML = `
+        <div class="app">
+          <div class="appimg"><img src="${iconUrl}" alt="App Icon"></div>
+          <div class="appname">
+            <p><strong>Name:</strong> ${appName}</p>
+            <p><strong>Bundle ID:</strong> ${bundleId}</p>
+          </div>
+          <div class="btns">
+            <button class="delete btn" onclick="deleteApp(this)">Delete</button>
+            <button class="download-plist btn" onclick="window.location.href='${plistUrl}'">Download Plist</button>
+          </div>
+        </div>
+      `;
+      appList.innerHTML += appHTML;
+      appCount++;
+      updateAppCount();
+    }
+
+    function deleteApp(button) {
+      const appDiv = button.closest(".app");
+      appDiv.remove();
+      appCount--;
+      updateAppCount();
+    }
+
+    function uploadFile() {
+      const fileInput = document.getElementById("fileInput");
+      const file = fileInput.files[0];
+
+      if (!file || !file.name.endsWith('.ipa')) {
+        alert("Please select a valid IPA file.");
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024 * 1024) {
+        alert("The file exceeds the maximum allowed size of 10GB.");
+        return;
+      }
+
+      const xhr = new XMLHttpRequest();
+      const fileName = uniqid() + "_20230502_202305%2F" + encodeURIComponent(file.name);
+      const url = "https://s3.us.archive.org/" + fileName;
+
+      xhr.open("PUT", url, true);
+
+      const startTime = Date.now();
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = (e.loaded / e.total) * 100;
+          document.getElementById("progressBar").style.width = percentComplete + "%";
+          document.getElementById("progressBar").innerText = percentComplete.toFixed(2) + "%";
+
+          const currentTime = Date.now();
+          const timeElapsed = (currentTime - startTime) / 1000;
+          const uploadSpeed = (e.loaded / 1024) / timeElapsed;
+          document.getElementById("speed").innerText = "Upload speed: " + uploadSpeed.toFixed(2) + " KB/s";
+        }
+      };
+
+      xhr.onreadystatechange = () => {
+        if (xhr.readyState === XMLHttpRequest.DONE && xhr.status === 200) {
+          const appName = file.name.replace(".ipa", "");
+          const plistData = generatePlist(url, appName);
+          addToAppList(appName, "com.example." + generateRandomString(16), "https://example.com/icon.png", plistData.plistName + ".plist");
+        }
+      };
+
+      xhr.send(file);
+    }
+
+    function uniqid() {
+      const now = Date.now();
+      const random = Math.floor(Math.random() * 1000);
+      return now.toString(36) + random.toString(36);
+    }
+  </script>
+</body>
+</html>
